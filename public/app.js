@@ -9,6 +9,65 @@ let origPageHeight = 0; // original PDF page height (scale 1)
 let adminToken = localStorage.getItem('adminToken') || null;
 let isAdmin = false;
 
+// ============ LANGUAGE ============
+const LANGUAGES = {
+  '': 'Unknown',
+  'da': 'Dansk',
+  'en': 'English',
+  'de': 'Deutsch',
+  'sv': 'Svenska',
+  'no': 'Norsk',
+  'nl': 'Nederlands',
+  'fr': 'Français',
+  'es': 'Español',
+  'it': 'Italiano',
+  'pt': 'Português',
+  'pl': 'Polski',
+  'fi': 'Suomi',
+  'cs': 'Čeština',
+  'ro': 'Română',
+  'hu': 'Magyar',
+  'bg': 'Български',
+  'el': 'Ελληνικά',
+};
+
+// Simple language detection from text using common words
+function detectLanguage(text) {
+  const lower = text.toLowerCase();
+  const patterns = [
+    { lang: 'da', words: ['og', 'den', 'det', 'er', 'til', 'med', 'som', 'kan', 'på', 'af', 'ikke', 'har', 'fra', 'eller', 'også', 'være', 'blev', 'efter', 'inden', 'alle'] },
+    { lang: 'en', words: ['the', 'and', 'for', 'that', 'with', 'this', 'from', 'have', 'are', 'not', 'but', 'been', 'they', 'which', 'will', 'their', 'would', 'about', 'could', 'into'] },
+    { lang: 'de', words: ['und', 'die', 'der', 'das', 'ist', 'ein', 'eine', 'für', 'mit', 'auf', 'nicht', 'sich', 'auch', 'werden', 'nach', 'noch', 'wird', 'über', 'kann', 'haben'] },
+    { lang: 'sv', words: ['och', 'att', 'det', 'som', 'för', 'med', 'den', 'inte', 'har', 'till', 'från', 'kan', 'vara', 'också', 'efter', 'eller', 'alla', 'denna', 'blev', 'ska'] },
+    { lang: 'no', words: ['og', 'det', 'som', 'for', 'med', 'den', 'ikke', 'har', 'til', 'fra', 'kan', 'være', 'også', 'etter', 'eller', 'alle', 'denne', 'ble', 'skal', 'vil'] },
+    { lang: 'nl', words: ['het', 'een', 'van', 'dat', 'met', 'zijn', 'niet', 'voor', 'ook', 'maar', 'worden', 'heeft', 'naar', 'deze', 'nog', 'door', 'wel', 'werd', 'toen', 'alle'] },
+    { lang: 'fr', words: ['les', 'des', 'est', 'une', 'que', 'dans', 'pour', 'pas', 'qui', 'sur', 'avec', 'sont', 'mais', 'par', 'plus', 'tout', 'cette', 'nous', 'elle', 'comme'] },
+    { lang: 'es', words: ['que', 'los', 'del', 'las', 'una', 'por', 'con', 'para', 'como', 'pero', 'más', 'todo', 'esta', 'son', 'entre', 'cuando', 'muy', 'sin', 'sobre', 'puede'] },
+    { lang: 'it', words: ['che', 'del', 'per', 'una', 'con', 'non', 'sono', 'anche', 'come', 'più', 'questo', 'stato', 'dalla', 'essere', 'suo', 'questa', 'fatto', 'tutto', 'hanno', 'nel'] },
+    { lang: 'pt', words: ['que', 'uma', 'para', 'com', 'não', 'por', 'mais', 'como', 'dos', 'das', 'tem', 'mas', 'foi', 'isso', 'ser', 'são', 'está', 'bem', 'sua', 'pelo'] },
+    { lang: 'pl', words: ['nie', 'jest', 'się', 'jak', 'ale', 'tak', 'już', 'czy', 'tylko', 'jego', 'ten', 'tego', 'był', 'przez', 'tym', 'dla', 'tej', 'aby', 'jeszcze', 'może'] },
+    { lang: 'fi', words: ['oli', 'hän', 'kun', 'olla', 'sen', 'mutta', 'niin', 'kuin', 'vain', 'ovat', 'tämä', 'sitten', 'myös', 'nyt', 'minä', 'ole', 'kanssa', 'mitä', 'kaikki', 'itse'] },
+  ];
+
+  // Count word boundary matches
+  const scores = patterns.map(({ lang, words }) => {
+    let score = 0;
+    for (const w of words) {
+      const regex = new RegExp('\\b' + w + '\\b', 'gi');
+      const matches = lower.match(regex);
+      if (matches) score += matches.length;
+    }
+    return { lang, score };
+  });
+
+  scores.sort((a, b) => b.score - a.score);
+  // Require a minimum threshold and some margin over 2nd place
+  if (scores[0].score > 5 && scores[0].score > scores[1].score * 1.3) {
+    return scores[0].lang;
+  }
+  return '';
+}
+
 // ============ DOM ============
 const libraryView = document.getElementById('library-view');
 const readerView = document.getElementById('reader-view');
@@ -141,8 +200,12 @@ function renderGrid(pdfs) {
   pdfs.forEach(pdf => {
     const card = document.createElement('div');
     card.className = 'pdf-card';
+    const langLabel = pdf.language && LANGUAGES[pdf.language] ? LANGUAGES[pdf.language] : '';
+    const langCode = pdf.language || '';
     card.innerHTML = `
-      <div class="pdf-card-thumbnail" data-id="${pdf.id}"></div>
+      <div class="pdf-card-thumbnail" data-id="${pdf.id}">
+        ${langLabel ? `<span class="lang-badge">${escapeHtml(langLabel)}</span>` : ''}
+      </div>
       <div class="pdf-card-info">
         <div class="pdf-card-name" title="${escapeHtml(pdf.originalName)}">${escapeHtml(pdf.originalName)}</div>
         <div class="pdf-card-meta">
@@ -150,17 +213,33 @@ function renderGrid(pdfs) {
           <span>${formatDate(pdf.uploadedAt)}</span>
         </div>
       </div>
-      ${isAdmin ? `<button class="pdf-card-delete" data-id="${pdf.id}" title="Delete">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      </button>` : ''}
+      ${isAdmin ? `<div class="pdf-card-actions">
+        <button class="pdf-card-lang-edit" data-id="${pdf.id}" data-lang="${langCode}" title="Edit language">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+          <span>${langLabel || 'Set language'}</span>
+        </button>
+        <button class="pdf-card-delete" data-id="${pdf.id}" title="Delete">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>` : ''}
     `;
 
     card.addEventListener('click', (e) => {
       if (e.target.closest('.pdf-card-delete')) return;
       openReader(pdf);
     });
+
+    const langEditBtn = card.querySelector('.pdf-card-lang-edit');
+    if (langEditBtn) {
+      langEditBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openLanguageModal(pdf);
+      });
+    }
 
     const deleteBtn = card.querySelector('.pdf-card-delete');
     if (deleteBtn) {
@@ -215,12 +294,37 @@ fileInput.addEventListener('change', () => {
   fileInput.value = '';
 });
 
-async function uploadFile(file) {
-  const formData = new FormData();
-  formData.append('pdf', file);
+async function detectLanguageFromPdf(file) {
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let text = '';
+    // Extract text from first 3 pages
+    const pagesToCheck = Math.min(doc.numPages, 3);
+    for (let i = 1; i <= pagesToCheck; i++) {
+      const page = await doc.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(item => item.str).join(' ') + ' ';
+    }
+    doc.destroy();
+    return detectLanguage(text);
+  } catch {
+    return '';
+  }
+}
 
+async function uploadFile(file) {
   uploadProgress.classList.remove('hidden');
   progressFill.style.width = '0%';
+  progressText.textContent = 'Detecting language...';
+
+  // Auto-detect language before uploading
+  const detectedLang = await detectLanguageFromPdf(file);
+
+  const formData = new FormData();
+  formData.append('pdf', file);
+  if (detectedLang) formData.append('language', detectedLang);
+
   progressText.textContent = 'Uploading...';
 
   const xhr = new XMLHttpRequest();
@@ -237,8 +341,9 @@ async function uploadFile(file) {
 
   xhr.onload = () => {
     if (xhr.status === 200) {
-      progressText.textContent = 'Done!';
-      setTimeout(() => uploadProgress.classList.add('hidden'), 1500);
+      const langName = detectedLang ? LANGUAGES[detectedLang] || detectedLang : '';
+      progressText.textContent = langName ? `Done! (${langName})` : 'Done!';
+      setTimeout(() => uploadProgress.classList.add('hidden'), 2000);
       loadLibrary();
     } else {
       progressText.textContent = 'Upload failed';
@@ -697,6 +802,90 @@ document.addEventListener('keydown', (e) => {
     renderDetailPage();
   }
 });
+
+// ============ LANGUAGE MODAL ============
+function openLanguageModal(pdf) {
+  // Remove existing modal if any
+  const existing = document.getElementById('lang-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'lang-modal';
+  modal.className = 'modal-overlay';
+  const currentLang = pdf.language || '';
+
+  let options = '';
+  for (const [code, name] of Object.entries(LANGUAGES)) {
+    options += `<option value="${code}" ${code === currentLang ? 'selected' : ''}>${name}</option>`;
+  }
+
+  modal.innerHTML = `
+    <div class="modal">
+      <h3>Set Language</h3>
+      <p class="lang-modal-file">${escapeHtml(pdf.originalName)}</p>
+      <select id="lang-select" class="lang-select">${options}</select>
+      <div class="modal-actions">
+        <button type="button" id="lang-cancel" class="btn-secondary">Cancel</button>
+        <button type="button" id="lang-detect" class="btn-secondary">Auto-detect</button>
+        <button type="button" id="lang-save" class="btn-primary">Save</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const select = document.getElementById('lang-select');
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+
+  document.getElementById('lang-cancel').addEventListener('click', () => modal.remove());
+
+  document.getElementById('lang-detect').addEventListener('click', async () => {
+    const btn = document.getElementById('lang-detect');
+    btn.textContent = 'Detecting...';
+    btn.disabled = true;
+    try {
+      const doc = await pdfjsLib.getDocument(`/uploads/${pdf.filename}`).promise;
+      let text = '';
+      const pagesToCheck = Math.min(doc.numPages, 3);
+      for (let i = 1; i <= pagesToCheck; i++) {
+        const page = await doc.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map(item => item.str).join(' ') + ' ';
+      }
+      doc.destroy();
+      const detected = detectLanguage(text);
+      if (detected) {
+        select.value = detected;
+        btn.textContent = `Detected: ${LANGUAGES[detected]}`;
+      } else {
+        btn.textContent = 'Could not detect';
+      }
+    } catch {
+      btn.textContent = 'Detection failed';
+    }
+    setTimeout(() => {
+      btn.textContent = 'Auto-detect';
+      btn.disabled = false;
+    }, 2000);
+  });
+
+  document.getElementById('lang-save').addEventListener('click', async () => {
+    const lang = select.value;
+    await fetch(`/api/pdfs/${pdf.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + adminToken
+      },
+      body: JSON.stringify({ language: lang })
+    });
+    modal.remove();
+    loadLibrary();
+  });
+}
 
 // ============ UTILS ============
 function formatSize(bytes) {

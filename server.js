@@ -107,6 +107,7 @@ app.post('/api/upload', requireAdmin, upload.single('pdf'), (req, res) => {
     originalName: req.file.originalname,
     filename: req.file.filename,
     size: req.file.size,
+    language: req.body.language || '',
     uploadedAt: new Date().toISOString()
   };
   meta.push(entry);
@@ -119,6 +120,18 @@ app.post('/api/upload', requireAdmin, upload.single('pdf'), (req, res) => {
 app.get('/api/pdfs', (req, res) => {
   const meta = readMeta();
   res.json(meta);
+});
+
+// Update PDF metadata (admin only)
+app.patch('/api/pdfs/:id', requireAdmin, (req, res) => {
+  const meta = readMeta();
+  const entry = meta.find(m => m.id === req.params.id);
+  if (!entry) return res.status(404).json({ error: 'Not found' });
+
+  if (req.body.language !== undefined) entry.language = req.body.language;
+
+  writeMeta(meta);
+  res.json(entry);
 });
 
 // Delete a PDF (admin only)

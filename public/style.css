@@ -177,6 +177,7 @@ main {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  position: relative;
 }
 
 .pdf-card-thumbnail canvas {
@@ -206,10 +207,56 @@ main {
   color: var(--text-secondary);
 }
 
-.pdf-card-delete {
+/* Language badge on thumbnail */
+.lang-badge {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 500;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  z-index: 2;
+  backdrop-filter: blur(4px);
+}
+
+/* Card actions row */
+.pdf-card-actions {
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
+  display: flex;
+  gap: 0.3rem;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.pdf-card:hover .pdf-card-actions {
+  opacity: 1;
+}
+
+.pdf-card-lang-edit {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 6px;
+  border: none;
+  background: rgba(0,0,0,0.5);
+  color: white;
+  cursor: pointer;
+  font-size: 0.7rem;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+}
+
+.pdf-card-lang-edit:hover {
+  background: rgba(0,0,0,0.75);
+}
+
+.pdf-card-delete {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -220,16 +267,32 @@ main {
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transition: opacity var(--transition);
-}
-
-.pdf-card:hover .pdf-card-delete {
-  opacity: 1;
+  backdrop-filter: blur(4px);
 }
 
 .pdf-card-delete:hover {
   background: var(--danger);
+}
+
+/* Language select in modal */
+.lang-select {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background: var(--bg);
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.lang-modal-file {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Empty state */
