@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flipbook – PDF Viewer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- LIBRARY VIEW -->
+  <div id="library-view">
+    <header>
+      <div class="header-content">
+        <h1>📖 Flipbook</h1>
+        <p class="subtitle">Upload og gennemse dine PDF-filer som interaktive bøger</p>
+      </div>
+    </header>
+
+    <main>
+      <!-- Upload area -->
+      <div class="upload-section">
+        <div id="drop-zone" class="drop-zone">
+          <div class="drop-zone-content">
+            <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p>Træk en PDF-fil hertil eller <span class="browse-link">gennemse</span></p>
+            <p class="drop-hint">Max 100 MB pr. fil</p>
+          </div>
+          <input type="file" id="file-input" accept=".pdf" hidden>
+        </div>
+        <div id="upload-progress" class="upload-progress hidden">
+          <div class="progress-bar"><div class="progress-fill"></div></div>
+          <span class="progress-text">Uploader...</span>
+        </div>
+      </div>
+
+      <!-- PDF Grid -->
+      <div class="grid-header">
+        <h2>Dine dokumenter</h2>
+        <span id="pdf-count" class="pdf-count">0 filer</span>
+      </div>
+      <div id="pdf-grid" class="pdf-grid">
+        <div id="empty-state" class="empty-state">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <p>Ingen dokumenter endnu</p>
+          <p class="empty-hint">Upload en PDF for at komme i gang</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- READER VIEW -->
+  <div id="reader-view" class="hidden">
+    <div class="reader-toolbar">
+      <button id="btn-back" class="toolbar-btn" title="Tilbage">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        <span>Tilbage</span>
+      </button>
+      <div class="toolbar-title" id="reader-title">Dokument</div>
+      <div class="toolbar-controls">
+        <button id="btn-download" class="toolbar-btn" title="Download">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+        </button>
+        <button id="btn-fullscreen" class="toolbar-btn" title="Fuldskærm">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 3 21 3 21 9"/>
+            <polyline points="9 21 3 21 3 15"/>
+            <line x1="21" y1="3" x2="14" y2="10"/>
+            <line x1="3" y1="21" x2="10" y2="14"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="reader-container">
+      <button id="btn-prev" class="nav-btn nav-prev" title="Forrige side">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+
+      <div id="flipbook" class="flipbook"></div>
+
+      <button id="btn-next" class="nav-btn nav-next" title="Næste side">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 6 15 12 9 18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="reader-footer">
+      <span id="page-info">Side 1 af 1</span>
+      <input type="range" id="page-slider" min="1" max="1" value="1" class="page-slider">
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  </script>
+  <script src="/app.js"></script>
+</body>
+</html>
