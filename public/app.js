@@ -292,38 +292,17 @@ async function openReader(pdf) {
     const scaleW = maxW / origViewport.width;
     const scale = Math.min(scaleH, scaleW, 2);
 
-    // Render first few pages immediately, then the rest
-    const batchSize = 4;
-    const firstBatch = Math.min(batchSize, totalPages);
-
-    for (let i = 1; i <= firstBatch; i++) {
+    // Render all pages before initializing flipbook
+    for (let i = 1; i <= totalPages; i++) {
+      if (!pdfDoc) return; // Reader was closed
       const img = await renderPageToImage(pdfDoc, i, scale);
       pageImages.push(img);
     }
 
-    // Initialize flipbook with what we have so far
+    // Initialize flipbook once with all pages
     initFlipbook(origViewport.width * scale, origViewport.height * scale);
-
-    // Render remaining pages in background
-    if (totalPages > firstBatch) {
-      renderRemainingPages(firstBatch + 1, totalPages, scale);
-    }
   } catch (err) {
     flipbook.innerHTML = '<p style="color:#ef4444">Could not load PDF</p>';
-  }
-}
-
-async function renderRemainingPages(from, to, scale) {
-  for (let i = from; i <= to; i++) {
-    if (!pdfDoc) return; // Reader was closed
-    const img = await renderPageToImage(pdfDoc, i, scale);
-    pageImages.push(img);
-
-    // Rebuild flipbook with new pages
-    if (pageFlip) {
-      const currentPage = pageFlip.getCurrentPageIndex();
-      rebuildFlipbook(currentPage);
-    }
   }
 }
 
@@ -378,6 +357,7 @@ function rebuildFlipbook(restorePage) {
     pageFlip.destroy();
     pageFlip = null;
   }
+  if (pageImages.length === 0) return;
 
   flipbook.innerHTML = '';
   pageImages.forEach((src, i) => {
