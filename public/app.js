@@ -673,6 +673,159 @@ window.addEventListener('resize', () => {
   }, 300);
 });
 
+// ============ MAGNIFYING GLASS ============
+const MAGNIFIER_SIZE = 180;   // diameter in px
+const MAGNIFIER_ZOOM = 2.5;   // zoom factor
+const LONG_PRESS_MS = 300;    // ms to trigger on mobile
+
+const magnifier = document.createElement('canvas');
+magnifier.id = 'magnifier';
+magnifier.width = MAGNIFIER_SIZE * 2;  // hi-dpi
+magnifier.height = MAGNIFIER_SIZE * 2;
+magnifier.style.cssText = `
+  position: fixed; width: ${MAGNIFIER_SIZE}px; height: ${MAGNIFIER_SIZE}px;
+  border-radius: 50%; border: 3px solid rgba(255,255,255,0.9);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.15);
+  pointer-events: none; z-index: 9999; display: none;
+  image-rendering: auto;
+`;
+document.body.appendChild(magnifier);
+const magCtx = magnifier.getContext('2d');
+
+let magActive = false;
+let longPressTimer = null;
+let magImg = null; // Image element for the current page source
+
+function findPageImgAt(x, y) {
+  // Find which page image element is under the pointer
+  const els = document.elementsFromPoint(x, y);
+  for (const el of els) {
+    if (el.tagName === 'IMG' && el.closest('.page-content')) {
+      return el;
+    }
+    // Also check canvas inside stPageFlip
+    if (el.tagName === 'CANVAS' && el.closest('.stf__parent')) {
+      return el;
+    }
+  }
+  return null;
+}
+
+function drawMagnifier(clientX, clientY) {
+  if (!magImg) return;
+
+  // Position magnifier above finger on mobile, centered on cursor on desktop
+  const isMobile = 'ontouchstart' in window;
+  const offsetY = isMobile ? -MAGNIFIER_SIZE - 30 : -MAGNIFIER_SIZE / 2;
+  const left = clientX - MAGNIFIER_SIZE / 2;
+  const top = clientY + offsetY;
+  magnifier.style.left = Math.max(0, Math.min(left, window.innerWidth - MAGNIFIER_SIZE)) + 'px';
+  magnifier.style.top = Math.max(0, top) + 'px';
+
+  // Calculate source coordinates relative to the image/canvas
+  const rect = magImg.getBoundingClientRect();
+  const relX = (clientX - rect.left) / rect.width;
+  const relY = (clientY - rect.top) / rect.height;
+
+  // Source dimensions (the actual image/canvas pixel size)
+  const srcW = magImg.naturalWidth || magImg.width;
+  const srcH = magImg.naturalHeight || magImg.height;
+
+  // Area to sample from the source
+  const sampleW = (MAGNIFIER_SIZE / rect.width) * srcW / MAGNIFIER_ZOOM;
+  const sampleH = (MAGNIFIER_SIZE / rect.height) * srcH / MAGNIFIER_ZOOM;
+  const sx = relX * srcW - sampleW / 2;
+  const sy = relY * srcH - sampleH / 2;
+
+  magCtx.clearRect(0, 0, magnifier.width, magnifier.height);
+  magCtx.save();
+  magCtx.beginPath();
+  magCtx.arc(magnifier.width / 2, magnifier.height / 2, magnifier.width / 2, 0, Math.PI * 2);
+  magCtx.clip();
+  magCtx.imageSmoothingEnabled = true;
+  magCtx.imageSmoothingQuality = 'high';
+  magCtx.drawImage(magImg, sx, sy, sampleW, sampleH, 0, 0, magnifier.width, magnifier.height);
+  magCtx.restore();
+}
+
+function startMagnifier(clientX, clientY) {
+  const target = findPageImgAt(clientX, clientY);
+  if (!target) return;
+  magImg = target;
+  magActive = true;
+  magnifier.style.display = 'block';
+  drawMagnifier(clientX, clientY);
+}
+
+function moveMagnifier(clientX, clientY) {
+  if (!magActive) return;
+  // Update target image in case user moves across page boundary
+  const target = findPageImgAt(clientX, clientY);
+  if (target) magImg = target;
+  drawMagnifier(clientX, clientY);
+}
+
+function stopMagnifier() {
+  magActive = false;
+  magImg = null;
+  magnifier.style.display = 'none';
+  clearTimeout(longPressTimer);
+  longPressTimer = null;
+}
+
+// Desktop: hold mouse button on flipbook
+const readerContainer = document.querySelector('.reader-container');
+
+readerContainer.addEventListener('mousedown', (e) => {
+  if (e.button !== 0) return; // left button only
+  if (readerView.classList.contains('hidden')) return;
+  longPressTimer = setTimeout(() => {
+    startMagnifier(e.clientX, e.clientY);
+  }, LONG_PRESS_MS);
+});
+
+document.addEventListener('mousemove', (e) => {
+  if (magActive) {
+    e.preventDefault();
+    moveMagnifier(e.clientX, e.clientY);
+  }
+});
+
+document.addEventListener('mouseup', () => {
+  stopMagnifier();
+});
+
+// Mobile: long-press touch on flipbook
+readerContainer.addEventListener('touchstart', (e) => {
+  if (readerView.classList.contains('hidden')) return;
+  if (e.touches.length !== 1) return;
+  const touch = e.touches[0];
+  const tx = touch.clientX, ty = touch.clientY;
+  longPressTimer = setTimeout(() => {
+    startMagnifier(tx, ty);
+  }, LONG_PRESS_MS);
+}, { passive: true });
+
+readerContainer.addEventListener('touchmove', (e) => {
+  if (magActive) {
+    e.preventDefault();
+    const touch = e.touches[0];
+    moveMagnifier(touch.clientX, touch.clientY);
+  } else {
+    // User is swiping/scrolling, cancel long-press
+    clearTimeout(longPressTimer);
+    longPressTimer = null;
+  }
+}, { passive: false });
+
+readerContainer.addEventListener('touchend', () => {
+  stopMagnifier();
+});
+
+readerContainer.addEventListener('touchcancel', () => {
+  stopMagnifier();
+});
+
 // ============ DETAIL VIEW (zoom + text) ============
 const detailView = document.getElementById('detail-view');
 const detailCanvas = document.getElementById('detail-canvas');
