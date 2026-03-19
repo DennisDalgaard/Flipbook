@@ -1,11 +1,52 @@
 const express = require('express');
 const multer = require('multer');
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
+// Simple token store (in-memory, survives until restart)
+const validTokens = new Set();
+
+app.use(express.json());
+
+// Auth middleware – checks Bearer token
+function requireAdmin(req, res, next) {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Login påkrævet' });
+  }
+  const token = auth.slice(7);
+  if (!validTokens.has(token)) {
+    return res.status(401).json({ error: 'Ugyldigt token' });
+  }
+  next();
+}
+
+// Login endpoint
+app.post('/api/login', (req, res) => {
+  const { password } = req.body;
+  if (password !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'Forkert adgangskode' });
+  }
+  const token = crypto.randomBytes(32).toString('hex');
+  validTokens.add(token);
+  res.json({ token });
+});
+
+// Check if currently authenticated
+app.get('/api/auth-check', (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.json({ admin: false });
+  }
+  const token = auth.slice(7);
+  res.json({ admin: validTokens.has(token) });
+});
 
 // Ensure uploads directory exists
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -54,8 +95,8 @@ function writeMeta(data) {
   fs.writeFileSync(metaPath, JSON.stringify(data, null, 2));
 }
 
-// Upload endpoint
-app.post('/api/upload', upload.single('pdf'), (req, res) => {
+// Upload endpoint (admin only)
+app.post('/api/upload', requireAdmin, upload.single('pdf'), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
@@ -80,8 +121,8 @@ app.get('/api/pdfs', (req, res) => {
   res.json(meta);
 });
 
-// Delete a PDF
-app.delete('/api/pdfs/:id', (req, res) => {
+// Delete a PDF (admin only)
+app.delete('/api/pdfs/:id', requireAdmin, (req, res) => {
   const meta = readMeta();
   const idx = meta.findIndex(m => m.id === req.params.id);
   if (idx === -1) return res.status(404).json({ error: 'Not found' });

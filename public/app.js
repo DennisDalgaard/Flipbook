@@ -4,6 +4,8 @@ let pdfDoc = null;
 let pageFlip = null;
 let totalPages = 0;
 let pageImages = []; // data URLs for each page
+let adminToken = localStorage.getItem('adminToken') || null;
+let isAdmin = false;
 
 // ============ DOM ============
 const libraryView = document.getElementById('library-view');
@@ -16,6 +18,14 @@ const progressText = document.querySelector('.progress-text');
 const pdfGrid = document.getElementById('pdf-grid');
 const emptyState = document.getElementById('empty-state');
 const pdfCount = document.getElementById('pdf-count');
+const adminBtn = document.getElementById('admin-btn');
+const adminBtnText = document.getElementById('admin-btn-text');
+const loginModal = document.getElementById('login-modal');
+const loginForm = document.getElementById('login-form');
+const loginPassword = document.getElementById('login-password');
+const loginError = document.getElementById('login-error');
+const loginCancel = document.getElementById('login-cancel');
+const uploadSection = document.querySelector('.upload-section');
 const flipbook = document.getElementById('flipbook');
 const pageInfo = document.getElementById('page-info');
 const pageSlider = document.getElementById('page-slider');
@@ -25,6 +35,87 @@ const btnPrev = document.getElementById('btn-prev');
 const btnNext = document.getElementById('btn-next');
 const btnDownload = document.getElementById('btn-download');
 const btnFullscreen = document.getElementById('btn-fullscreen');
+
+// ============ ADMIN ============
+async function checkAdmin() {
+  if (!adminToken) {
+    setAdminUI(false);
+    return;
+  }
+  try {
+    const res = await fetch('/api/auth-check', {
+      headers: { 'Authorization': 'Bearer ' + adminToken }
+    });
+    const data = await res.json();
+    setAdminUI(data.admin);
+    if (!data.admin) {
+      adminToken = null;
+      localStorage.removeItem('adminToken');
+    }
+  } catch {
+    setAdminUI(false);
+  }
+}
+
+function setAdminUI(admin) {
+  isAdmin = admin;
+  if (admin) {
+    uploadSection.classList.remove('hidden');
+    adminBtn.classList.add('logged-in');
+    adminBtnText.textContent = 'Log ud';
+  } else {
+    uploadSection.classList.add('hidden');
+    adminBtn.classList.remove('logged-in');
+    adminBtnText.textContent = 'Admin';
+  }
+  // Re-render grid to show/hide delete buttons
+  loadLibrary();
+}
+
+adminBtn.addEventListener('click', () => {
+  if (isAdmin) {
+    // Log out
+    adminToken = null;
+    localStorage.removeItem('adminToken');
+    setAdminUI(false);
+  } else {
+    loginModal.classList.remove('hidden');
+    loginPassword.value = '';
+    loginError.classList.add('hidden');
+    loginPassword.focus();
+  }
+});
+
+loginCancel.addEventListener('click', () => {
+  loginModal.classList.add('hidden');
+});
+
+loginModal.addEventListener('click', (e) => {
+  if (e.target === loginModal) loginModal.classList.add('hidden');
+});
+
+loginForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  loginError.classList.add('hidden');
+  try {
+    const res = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: loginPassword.value })
+    });
+    if (!res.ok) {
+      loginError.classList.remove('hidden');
+      return;
+    }
+    const data = await res.json();
+    adminToken = data.token;
+    localStorage.setItem('adminToken', adminToken);
+    loginModal.classList.add('hidden');
+    setAdminUI(true);
+  } catch {
+    loginError.classList.remove('hidden');
+  }
+});
 
 // ============ LIBRARY ============
 async function loadLibrary() {
@@ -57,11 +148,11 @@ function renderGrid(pdfs) {
           <span>${formatDate(pdf.uploadedAt)}</span>
         </div>
       </div>
-      <button class="pdf-card-delete" data-id="${pdf.id}" title="Slet">
+      ${isAdmin ? `<button class="pdf-card-delete" data-id="${pdf.id}" title="Slet">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
-      </button>
+      </button>` : ''}
     `;
 
     card.addEventListener('click', (e) => {
@@ -69,12 +160,18 @@ function renderGrid(pdfs) {
       openReader(pdf);
     });
 
-    card.querySelector('.pdf-card-delete').addEventListener('click', async (e) => {
-      e.stopPropagation();
-      if (!confirm(`Slet "${pdf.originalName}"?`)) return;
-      await fetch(`/api/pdfs/${pdf.id}`, { method: 'DELETE' });
-      loadLibrary();
-    });
+    const deleteBtn = card.querySelector('.pdf-card-delete');
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (!confirm(`Slet "${pdf.originalName}"?`)) return;
+        await fetch(`/api/pdfs/${pdf.id}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': 'Bearer ' + adminToken }
+        });
+        loadLibrary();
+      });
+    }
 
     pdfGrid.appendChild(card);
     generateThumbnail(pdf, card.querySelector('.pdf-card-thumbnail'));
@@ -126,6 +223,7 @@ async function uploadFile(file) {
 
   const xhr = new XMLHttpRequest();
   xhr.open('POST', '/api/upload');
+  xhr.setRequestHeader('Authorization', 'Bearer ' + adminToken);
 
   xhr.upload.onprogress = (e) => {
     if (e.lengthComputable) {
@@ -429,4 +527,4 @@ function escapeHtml(str) {
 }
 
 // ============ INIT ============
-loadLibrary();
+checkAdmin();

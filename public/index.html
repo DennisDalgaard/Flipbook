@@ -13,10 +13,36 @@
   <div id="library-view">
     <header>
       <div class="header-content">
-        <h1>📖 Flipbook</h1>
-        <p class="subtitle">Upload og gennemse dine PDF-filer som interaktive bøger</p>
+        <div class="header-top">
+          <div>
+            <h1>📖 Flipbook</h1>
+            <p class="subtitle">Gennemse PDF-filer som interaktive bøger</p>
+          </div>
+          <button id="admin-btn" class="admin-btn" title="Admin login">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span id="admin-btn-text">Admin</span>
+          </button>
+        </div>
       </div>
     </header>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="modal-overlay hidden">
+      <div class="modal">
+        <h3>Admin login</h3>
+        <form id="login-form">
+          <input type="password" id="login-password" placeholder="Adgangskode" autocomplete="current-password" required>
+          <div id="login-error" class="login-error hidden">Forkert adgangskode</div>
+          <div class="modal-actions">
+            <button type="button" id="login-cancel" class="btn-secondary">Annuller</button>
+            <button type="submit" class="btn-primary">Log ind</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <main>
       <!-- Upload area -->
