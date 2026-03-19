@@ -539,6 +539,74 @@ main {
   background: var(--bg);
 }
 
+/* ========== DETAIL VIEW ========== */
+#detail-view {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #1a1d23;
+}
+
+.detail-container {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.detail-page-wrapper {
+  position: relative;
+  display: inline-block;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+}
+
+#detail-canvas {
+  display: block;
+}
+
+.detail-text-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  line-height: 1;
+  opacity: 0.3;
+}
+
+.detail-text-layer span {
+  position: absolute;
+  white-space: pre;
+  color: transparent;
+  cursor: text;
+}
+
+.detail-text-layer span::selection {
+  background: rgba(79, 70, 229, 0.4);
+  color: transparent;
+}
+
+.detail-text-layer span::-moz-selection {
+  background: rgba(79, 70, 229, 0.4);
+  color: transparent;
+}
+
+.zoom-level {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  min-width: 50px;
+  text-align: center;
+  user-select: none;
+}
+
+.toolbar-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
 /* Loading spinner */
 .loading-spinner {
   width: 40px;

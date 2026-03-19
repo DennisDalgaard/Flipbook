@@ -449,6 +449,7 @@ function updateNavButtons() {
 
 function closeReader() {
   readerView.classList.add('hidden');
+  detailView.classList.add('hidden');
   libraryView.classList.remove('hidden');
   if (pageFlip) {
     pageFlip.destroy();
@@ -493,9 +494,10 @@ pageSlider.addEventListener('input', () => {
   if (pageFlip) pageFlip.turnToPage(page - 1);
 });
 
-// Keyboard navigation
+// Keyboard navigation (flipbook mode only)
 document.addEventListener('keydown', (e) => {
   if (readerView.classList.contains('hidden')) return;
+  if (!detailView.classList.contains('hidden')) return; // detail view handles its own keys
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
     if (pageFlip) pageFlip.flipPrev();
   } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
@@ -516,6 +518,158 @@ window.addEventListener('resize', () => {
       rebuildFlipbook(currentPage);
     }
   }, 300);
+});
+
+// ============ DETAIL VIEW (zoom + text) ============
+const detailView = document.getElementById('detail-view');
+const detailCanvas = document.getElementById('detail-canvas');
+const detailTextLayer = document.getElementById('detail-text-layer');
+const detailContainer = document.getElementById('detail-container');
+const detailPageWrapper = document.getElementById('detail-page-wrapper');
+const detailTitle = document.getElementById('detail-title');
+const detailPageInfo = document.getElementById('detail-page-info');
+const detailZoomLevel = document.getElementById('detail-zoom-level');
+const btnDetail = document.getElementById('btn-detail');
+const detailBtnBack = document.getElementById('detail-btn-back');
+const detailPrev = document.getElementById('detail-prev');
+const detailNext = document.getElementById('detail-next');
+const detailZoomIn = document.getElementById('detail-zoom-in');
+const detailZoomOut = document.getElementById('detail-zoom-out');
+const detailZoomFit = document.getElementById('detail-zoom-fit');
+
+let detailCurrentPage = 1;
+let detailZoom = 1;
+let detailBaseScale = 1; // scale that fits page to container height
+
+function openDetailView() {
+  // Get current page from flipbook
+  detailCurrentPage = pageFlip ? pageFlip.getCurrentPageIndex() + 1 : 1;
+  readerView.classList.add('hidden');
+  detailView.classList.remove('hidden');
+  detailTitle.textContent = currentPdf ? currentPdf.originalName : 'Document';
+
+  // Calculate fit-to-height scale
+  const containerH = detailContainer.clientHeight - 32;
+  const page1 = pdfDoc.getPage(1).then(p => {
+    const vp = p.getViewport({ scale: 1 });
+    detailBaseScale = containerH / vp.height;
+    detailZoom = 1;
+    renderDetailPage();
+  });
+}
+
+async function renderDetailPage() {
+  if (!pdfDoc) return;
+  const page = await pdfDoc.getPage(detailCurrentPage);
+  const scale = detailBaseScale * detailZoom;
+  const viewport = page.getViewport({ scale });
+
+  detailCanvas.width = viewport.width;
+  detailCanvas.height = viewport.height;
+  detailPageWrapper.style.width = viewport.width + 'px';
+  detailPageWrapper.style.height = viewport.height + 'px';
+
+  const ctx = detailCanvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport }).promise;
+
+  // Render text layer for text selection
+  detailTextLayer.innerHTML = '';
+  detailTextLayer.style.width = viewport.width + 'px';
+  detailTextLayer.style.height = viewport.height + 'px';
+
+  const textContent = await page.getTextContent();
+  textContent.items.forEach(item => {
+    const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+    const span = document.createElement('span');
+    span.textContent = item.str;
+    span.style.left = tx[4] + 'px';
+    span.style.top = (viewport.height - tx[5]) + 'px';
+    span.style.fontSize = Math.abs(tx[3]) + 'px';
+    span.style.fontFamily = item.fontName || 'sans-serif';
+    if (tx[0] !== 0) {
+      span.style.transform = `scaleX(${tx[0] / Math.abs(tx[3])})`;
+      span.style.transformOrigin = 'left bottom';
+    }
+    detailTextLayer.appendChild(span);
+  });
+
+  // Update UI
+  detailPageInfo.textContent = `Page ${detailCurrentPage} of ${totalPages}`;
+  detailZoomLevel.textContent = Math.round(detailZoom * 100) + '%';
+  detailPrev.disabled = detailCurrentPage <= 1;
+  detailNext.disabled = detailCurrentPage >= totalPages;
+}
+
+function closeDetailView() {
+  detailView.classList.add('hidden');
+  readerView.classList.remove('hidden');
+  // Sync page back to flipbook
+  if (pageFlip) {
+    pageFlip.turnToPage(detailCurrentPage - 1);
+  }
+}
+
+btnDetail.addEventListener('click', openDetailView);
+detailBtnBack.addEventListener('click', closeDetailView);
+
+detailPrev.addEventListener('click', () => {
+  if (detailCurrentPage > 1) {
+    detailCurrentPage--;
+    renderDetailPage();
+    detailContainer.scrollTop = 0;
+  }
+});
+
+detailNext.addEventListener('click', () => {
+  if (detailCurrentPage < totalPages) {
+    detailCurrentPage++;
+    renderDetailPage();
+    detailContainer.scrollTop = 0;
+  }
+});
+
+detailZoomIn.addEventListener('click', () => {
+  detailZoom = Math.min(detailZoom + 0.25, 5);
+  renderDetailPage();
+});
+
+detailZoomOut.addEventListener('click', () => {
+  detailZoom = Math.max(detailZoom - 0.25, 0.25);
+  renderDetailPage();
+});
+
+detailZoomFit.addEventListener('click', () => {
+  detailZoom = 1;
+  renderDetailPage();
+  detailContainer.scrollTop = 0;
+});
+
+// Scroll-wheel zoom in detail view
+detailContainer.addEventListener('wheel', (e) => {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    detailZoom = Math.min(Math.max(detailZoom + delta, 0.25), 5);
+    renderDetailPage();
+  }
+});
+
+// Keyboard navigation in detail view
+document.addEventListener('keydown', (e) => {
+  if (detailView.classList.contains('hidden')) return;
+  if (e.key === 'ArrowLeft') {
+    if (detailCurrentPage > 1) { detailCurrentPage--; renderDetailPage(); detailContainer.scrollTop = 0; }
+  } else if (e.key === 'ArrowRight') {
+    if (detailCurrentPage < totalPages) { detailCurrentPage++; renderDetailPage(); detailContainer.scrollTop = 0; }
+  } else if (e.key === 'Escape') {
+    closeDetailView();
+  } else if (e.key === '+' || e.key === '=') {
+    detailZoom = Math.min(detailZoom + 0.25, 5);
+    renderDetailPage();
+  } else if (e.key === '-') {
+    detailZoom = Math.max(detailZoom - 0.25, 0.25);
+    renderDetailPage();
+  }
 });
 
 // ============ UTILS ============
