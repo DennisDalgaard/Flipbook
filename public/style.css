@@ -569,26 +569,32 @@ main {
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
   overflow: hidden;
+  opacity: 1;
   line-height: 1;
 }
 
-.detail-text-layer span {
+.detail-text-layer > span {
   position: absolute;
   white-space: pre;
   color: transparent;
   cursor: text;
   user-select: text;
+  transform-origin: 0% 0%;
 }
 
-.detail-text-layer span::selection {
+.detail-text-layer > span::selection {
   background: rgba(240, 78, 60, 0.35);
+  color: transparent;
 }
 
-.detail-text-layer span::-moz-selection {
+.detail-text-layer > span::-moz-selection {
   background: rgba(240, 78, 60, 0.35);
+  color: transparent;
+}
+
+.detail-text-layer br {
+  display: none;
 }
 
 .zoom-level {

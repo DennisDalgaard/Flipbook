@@ -4,6 +4,8 @@ let pdfDoc = null;
 let pageFlip = null;
 let totalPages = 0;
 let pageImages = []; // data URLs for each page
+let origPageWidth = 0; // original PDF page width (scale 1)
+let origPageHeight = 0; // original PDF page height (scale 1)
 let adminToken = localStorage.getItem('adminToken') || null;
 let isAdmin = false;
 
@@ -287,7 +289,8 @@ async function openReader(pdf) {
 
     const firstPage = await pdfDoc.getPage(1);
     const origViewport = firstPage.getViewport({ scale: 1 });
-    const pageAspect = origViewport.width / origViewport.height;
+    origPageWidth = origViewport.width;
+    origPageHeight = origViewport.height;
 
     // In book mode (2 pages side by side), each page gets half the width
     const isMobile = window.innerWidth < 900;
@@ -369,7 +372,7 @@ function rebuildFlipbook(restorePage) {
     pageFlip.destroy();
     pageFlip = null;
   }
-  if (pageImages.length === 0) return;
+  if (pageImages.length === 0 || !origPageWidth) return;
 
   flipbook.innerHTML = '';
   pageImages.forEach((src, i) => {
@@ -388,20 +391,13 @@ function rebuildFlipbook(restorePage) {
   const containerW = Math.max(container.clientWidth - 120, 600);
   const isMobile = window.innerWidth < 900;
 
-  // Estimate page aspect from the first image
-  const tempImg = new Image();
-  tempImg.src = pageImages[0];
-  const imgW = tempImg.naturalWidth || 600;
-  const imgH = tempImg.naturalHeight || 800;
-  const pageAspect = imgW / imgH;
-
   const availW = isMobile ? containerW : containerW / 2;
-  const scaleByH = containerH / imgH;
-  const scaleByW = availW / imgW;
+  const scaleByH = containerH / origPageHeight;
+  const scaleByW = availW / origPageWidth;
   const fitScale = Math.min(scaleByH, scaleByW);
 
-  const displayW = Math.round(imgW * fitScale);
-  const displayH = Math.round(imgH * fitScale);
+  const displayW = Math.round(origPageWidth * fitScale);
+  const displayH = Math.round(origPageHeight * fitScale);
 
   pageFlip = new St.PageFlip(flipbook, {
     width: displayW,
@@ -491,13 +487,14 @@ btnFullscreen.addEventListener('click', () => {
 
 // Rebuild flipbook when entering/exiting fullscreen
 document.addEventListener('fullscreenchange', () => {
-  if (!readerView.classList.contains('hidden') && pageFlip) {
-    // Wait for the fullscreen transition to complete
-    setTimeout(() => {
-      const currentPage = pageFlip.getCurrentPageIndex();
-      rebuildFlipbook(currentPage);
-    }, 300);
-  }
+  if (readerView.classList.contains('hidden')) return;
+  if (!pageFlip && !pageImages.length) return;
+
+  // Wait for fullscreen transition to finish, then rebuild
+  setTimeout(() => {
+    const currentPage = pageFlip ? pageFlip.getCurrentPageIndex() : 0;
+    rebuildFlipbook(currentPage);
+  }, 500);
 });
 
 pageSlider.addEventListener('input', () => {
@@ -583,25 +580,17 @@ async function renderDetailPage() {
   const ctx = detailCanvas.getContext('2d');
   await page.render({ canvasContext: ctx, viewport }).promise;
 
-  // Render text layer for text selection
+  // Render text layer using PDF.js built-in renderTextLayer
   detailTextLayer.innerHTML = '';
   detailTextLayer.style.width = viewport.width + 'px';
   detailTextLayer.style.height = viewport.height + 'px';
 
   const textContent = await page.getTextContent();
-  textContent.items.forEach(item => {
-    const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
-    const span = document.createElement('span');
-    span.textContent = item.str;
-    span.style.left = tx[4] + 'px';
-    span.style.top = (viewport.height - tx[5]) + 'px';
-    span.style.fontSize = Math.abs(tx[3]) + 'px';
-    span.style.fontFamily = item.fontName || 'sans-serif';
-    if (tx[0] !== 0) {
-      span.style.transform = `scaleX(${tx[0] / Math.abs(tx[3])})`;
-      span.style.transformOrigin = 'left bottom';
-    }
-    detailTextLayer.appendChild(span);
+  pdfjsLib.renderTextLayer({
+    textContentSource: textContent,
+    container: detailTextLayer,
+    viewport: viewport,
+    textDivs: []
   });
 
   // Update UI
