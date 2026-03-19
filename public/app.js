@@ -1,10 +1,9 @@
 // ============ STATE ============
 let currentPdf = null;
 let pdfDoc = null;
-let currentSpread = 0; // 0-indexed spread number
+let pageFlip = null;
 let totalPages = 0;
-let pageCanvasCache = {};
-let isLoading = false;
+let pageImages = []; // data URLs for each page
 
 // ============ DOM ============
 const libraryView = document.getElementById('library-view');
@@ -35,7 +34,6 @@ async function loadLibrary() {
 }
 
 function renderGrid(pdfs) {
-  // Clear existing cards (keep empty state)
   pdfGrid.querySelectorAll('.pdf-card').forEach(c => c.remove());
 
   if (pdfs.length === 0) {
@@ -126,43 +124,49 @@ async function uploadFile(file) {
   progressFill.style.width = '0%';
   progressText.textContent = 'Uploader...';
 
-  try {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', '/api/upload');
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/upload');
 
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) {
-        const pct = Math.round((e.loaded / e.total) * 100);
-        progressFill.style.width = pct + '%';
-        progressText.textContent = `${pct}%`;
-      }
-    };
+  xhr.upload.onprogress = (e) => {
+    if (e.lengthComputable) {
+      const pct = Math.round((e.loaded / e.total) * 100);
+      progressFill.style.width = pct + '%';
+      progressText.textContent = `${pct}%`;
+    }
+  };
 
-    xhr.onload = () => {
-      if (xhr.status === 200) {
-        progressText.textContent = 'Færdig!';
-        setTimeout(() => uploadProgress.classList.add('hidden'), 1500);
-        loadLibrary();
-      } else {
-        progressText.textContent = 'Fejl ved upload';
-      }
-    };
-
-    xhr.onerror = () => {
+  xhr.onload = () => {
+    if (xhr.status === 200) {
+      progressText.textContent = 'Færdig!';
+      setTimeout(() => uploadProgress.classList.add('hidden'), 1500);
+      loadLibrary();
+    } else {
       progressText.textContent = 'Fejl ved upload';
-    };
+    }
+  };
 
-    xhr.send(formData);
-  } catch (err) {
+  xhr.onerror = () => {
     progressText.textContent = 'Fejl ved upload';
-  }
+  };
+
+  xhr.send(formData);
 }
 
 // ============ READER ============
+async function renderPageToImage(doc, pageNum, scale) {
+  const page = await doc.getPage(pageNum);
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement('canvas');
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+  const ctx = canvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return canvas.toDataURL('image/jpeg', 0.92);
+}
+
 async function openReader(pdf) {
   currentPdf = pdf;
-  pageCanvasCache = {};
-  currentSpread = 0;
+  pageImages = [];
 
   libraryView.classList.add('hidden');
   readerView.classList.remove('hidden');
@@ -176,155 +180,186 @@ async function openReader(pdf) {
     pageSlider.max = totalPages;
     pageSlider.value = 1;
 
-    renderSpread();
+    // Determine render scale based on container size
+    const container = document.querySelector('.reader-container');
+    const maxH = container.clientHeight - 40;
+    const maxW = (container.clientWidth - 120) / 2;
+
+    const firstPage = await pdfDoc.getPage(1);
+    const origViewport = firstPage.getViewport({ scale: 1 });
+    const scaleH = maxH / origViewport.height;
+    const scaleW = maxW / origViewport.width;
+    const scale = Math.min(scaleH, scaleW, 2);
+
+    // Render first few pages immediately, then the rest
+    const batchSize = 4;
+    const firstBatch = Math.min(batchSize, totalPages);
+
+    for (let i = 1; i <= firstBatch; i++) {
+      const img = await renderPageToImage(pdfDoc, i, scale);
+      pageImages.push(img);
+    }
+
+    // Initialize flipbook with what we have so far
+    initFlipbook(origViewport.width * scale, origViewport.height * scale);
+
+    // Render remaining pages in background
+    if (totalPages > firstBatch) {
+      renderRemainingPages(firstBatch + 1, totalPages, scale);
+    }
   } catch (err) {
     flipbook.innerHTML = '<p style="color:#ef4444">Kunne ikke indlæse PDF</p>';
   }
 }
 
+async function renderRemainingPages(from, to, scale) {
+  for (let i = from; i <= to; i++) {
+    if (!pdfDoc) return; // Reader was closed
+    const img = await renderPageToImage(pdfDoc, i, scale);
+    pageImages.push(img);
+
+    // Rebuild flipbook with new pages
+    if (pageFlip) {
+      const currentPage = pageFlip.getCurrentPageIndex();
+      rebuildFlipbook(currentPage);
+    }
+  }
+}
+
+function initFlipbook(pageWidth, pageHeight) {
+  flipbook.innerHTML = '';
+
+  // Create page elements
+  pageImages.forEach((src, i) => {
+    const div = document.createElement('div');
+    div.className = 'page-content';
+    div.setAttribute('data-density', (i === 0 || i === pageImages.length - 1) ? 'hard' : 'soft');
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = `Side ${i + 1}`;
+    div.appendChild(img);
+    flipbook.appendChild(div);
+  });
+
+  const isMobile = window.innerWidth < 900;
+
+  pageFlip = new St.PageFlip(flipbook, {
+    width: Math.round(pageWidth),
+    height: Math.round(pageHeight),
+    size: 'stretch',
+    minWidth: 200,
+    maxWidth: 800,
+    minHeight: 280,
+    maxHeight: 1200,
+    showCover: true,
+    maxShadowOpacity: 0.5,
+    mobileScrollSupport: true,
+    autoSize: true,
+    drawShadow: true,
+    flippingTime: 800,
+    usePortrait: isMobile,
+    startZIndex: 0,
+    startPage: 0,
+  });
+
+  pageFlip.loadFromHTML(flipbook.querySelectorAll('.page-content'));
+
+  pageFlip.on('flip', (e) => {
+    updatePageInfo(e.data);
+  });
+
+  updatePageInfo(0);
+  updateNavButtons();
+}
+
+function rebuildFlipbook(restorePage) {
+  if (pageFlip) {
+    pageFlip.destroy();
+    pageFlip = null;
+  }
+
+  flipbook.innerHTML = '';
+  pageImages.forEach((src, i) => {
+    const div = document.createElement('div');
+    div.className = 'page-content';
+    div.setAttribute('data-density', (i === 0 || i === pageImages.length - 1) ? 'hard' : 'soft');
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = `Side ${i + 1}`;
+    div.appendChild(img);
+    flipbook.appendChild(div);
+  });
+
+  const container = document.querySelector('.reader-container');
+  const maxH = container.clientHeight - 40;
+  const maxW = (container.clientWidth - 120) / 2;
+  const isMobile = window.innerWidth < 900;
+
+  pageFlip = new St.PageFlip(flipbook, {
+    width: Math.round(maxW),
+    height: Math.round(maxH),
+    size: 'stretch',
+    minWidth: 200,
+    maxWidth: 800,
+    minHeight: 280,
+    maxHeight: 1200,
+    showCover: true,
+    maxShadowOpacity: 0.5,
+    mobileScrollSupport: true,
+    autoSize: true,
+    drawShadow: true,
+    flippingTime: 800,
+    usePortrait: isMobile,
+    startZIndex: 0,
+    startPage: restorePage || 0,
+  });
+
+  pageFlip.loadFromHTML(flipbook.querySelectorAll('.page-content'));
+
+  pageFlip.on('flip', (e) => {
+    updatePageInfo(e.data);
+  });
+
+  updatePageInfo(restorePage || 0);
+}
+
+function updatePageInfo(pageIndex) {
+  const displayPage = pageIndex + 1;
+  pageInfo.textContent = `Side ${displayPage} af ${totalPages}`;
+  pageSlider.value = displayPage;
+  pageSlider.max = totalPages;
+  updateNavButtons();
+}
+
+function updateNavButtons() {
+  if (!pageFlip) return;
+  const current = pageFlip.getCurrentPageIndex();
+  const total = pageFlip.getPageCount();
+  btnPrev.disabled = current <= 0;
+  btnNext.disabled = current >= total - 1;
+}
+
 function closeReader() {
   readerView.classList.add('hidden');
   libraryView.classList.remove('hidden');
+  if (pageFlip) {
+    pageFlip.destroy();
+    pageFlip = null;
+  }
   if (pdfDoc) {
     pdfDoc.destroy();
     pdfDoc = null;
   }
-  pageCanvasCache = {};
-}
-
-function getSpreadPages() {
-  // Single page mode on small screens
-  const isMobile = window.innerWidth < 900;
-
-  if (isMobile) {
-    const page = currentSpread + 1;
-    return page <= totalPages ? [page] : [];
-  }
-
-  // Two-page spread: first and last pages are alone
-  if (currentSpread === 0) return [1];
-  const left = currentSpread * 2;
-  const right = left + 1;
-  if (left > totalPages) return [];
-  if (right > totalPages) return [left];
-  return [left, right];
-}
-
-function getTotalSpreads() {
-  const isMobile = window.innerWidth < 900;
-  if (isMobile) return totalPages;
-  if (totalPages <= 1) return 1;
-  // First page alone, then pairs, possibly last alone
-  return 1 + Math.ceil((totalPages - 1) / 2);
-}
-
-async function renderPage(pageNum) {
-  if (pageCanvasCache[pageNum]) return pageCanvasCache[pageNum].cloneNode(true);
-
-  const page = await pdfDoc.getPage(pageNum);
-
-  // Calculate scale to fit
-  const container = document.querySelector('.reader-container');
-  const maxH = container.clientHeight - 40;
-  const maxW = (container.clientWidth - 120) / (window.innerWidth < 900 ? 1 : 2);
-
-  const origViewport = page.getViewport({ scale: 1 });
-  const scaleH = maxH / origViewport.height;
-  const scaleW = maxW / origViewport.width;
-  const scale = Math.min(scaleH, scaleW, 2); // Cap at 2x
-
-  const viewport = page.getViewport({ scale });
-  const canvas = document.createElement('canvas');
-  canvas.width = viewport.width;
-  canvas.height = viewport.height;
-  const ctx = canvas.getContext('2d');
-  await page.render({ canvasContext: ctx, viewport }).promise;
-
-  pageCanvasCache[pageNum] = canvas;
-  return canvas.cloneNode(true);
-}
-
-async function renderSpread() {
-  if (isLoading) return;
-  isLoading = true;
-
-  const pages = getSpreadPages();
-  flipbook.innerHTML = '';
-
-  if (pages.length === 0) {
-    isLoading = false;
-    return;
-  }
-
-  // Render pages in parallel
-  const canvases = await Promise.all(pages.map(p => renderPage(p)));
-
-  flipbook.innerHTML = '';
-  canvases.forEach((canvas, i) => {
-    const pageDiv = document.createElement('div');
-    pageDiv.className = 'flipbook-page page-flip-enter';
-    // Copy canvas content to a new canvas in the DOM
-    const displayCanvas = document.createElement('canvas');
-    displayCanvas.width = canvas.width;
-    displayCanvas.height = canvas.height;
-    displayCanvas.getContext('2d').drawImage(canvas, 0, 0);
-    pageDiv.appendChild(displayCanvas);
-    flipbook.appendChild(pageDiv);
-  });
-
-  // Update UI
-  const firstPage = pages[0];
-  const lastPage = pages[pages.length - 1];
-  const label = pages.length === 2
-    ? `Side ${firstPage}–${lastPage} af ${totalPages}`
-    : `Side ${firstPage} af ${totalPages}`;
-  pageInfo.textContent = label;
-  pageSlider.value = firstPage;
-
-  btnPrev.disabled = currentSpread === 0;
-  btnNext.disabled = currentSpread >= getTotalSpreads() - 1;
-
-  isLoading = false;
-
-  // Preload next spread
-  preloadAdjacent();
-}
-
-async function preloadAdjacent() {
-  // Preload next and previous spread pages
-  const nextSpread = currentSpread + 1;
-  const prevSpread = currentSpread - 1;
-
-  const toPreload = [];
-  [prevSpread, nextSpread].forEach(s => {
-    const saved = currentSpread;
-    currentSpread = s;
-    const pages = getSpreadPages();
-    currentSpread = saved;
-    pages.forEach(p => {
-      if (p >= 1 && p <= totalPages && !pageCanvasCache[p]) {
-        toPreload.push(p);
-      }
-    });
-  });
-
-  // Preload without blocking
-  toPreload.forEach(p => renderPage(p).catch(() => {}));
+  pageImages = [];
 }
 
 // Navigation
 btnPrev.addEventListener('click', () => {
-  if (currentSpread > 0) {
-    currentSpread--;
-    renderSpread();
-  }
+  if (pageFlip) pageFlip.flipPrev();
 });
 
 btnNext.addEventListener('click', () => {
-  if (currentSpread < getTotalSpreads() - 1) {
-    currentSpread++;
-    renderSpread();
-  }
+  if (pageFlip) pageFlip.flipNext();
 });
 
 btnBack.addEventListener('click', closeReader);
@@ -347,26 +382,17 @@ btnFullscreen.addEventListener('click', () => {
 
 pageSlider.addEventListener('input', () => {
   const page = parseInt(pageSlider.value);
-  const isMobile = window.innerWidth < 900;
-  if (isMobile) {
-    currentSpread = page - 1;
-  } else {
-    if (page === 1) {
-      currentSpread = 0;
-    } else {
-      currentSpread = Math.ceil(page / 2);
-    }
-  }
-  renderSpread();
+  if (pageFlip) pageFlip.turnToPage(page - 1);
 });
 
 // Keyboard navigation
 document.addEventListener('keydown', (e) => {
   if (readerView.classList.contains('hidden')) return;
   if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-    btnPrev.click();
+    if (pageFlip) pageFlip.flipPrev();
   } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === ' ') {
-    btnNext.click();
+    e.preventDefault();
+    if (pageFlip) pageFlip.flipNext();
   } else if (e.key === 'Escape') {
     closeReader();
   }
@@ -377,11 +403,11 @@ let resizeTimeout;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimeout);
   resizeTimeout = setTimeout(() => {
-    if (!readerView.classList.contains('hidden') && pdfDoc) {
-      pageCanvasCache = {}; // Clear cache on resize for new dimensions
-      renderSpread();
+    if (!readerView.classList.contains('hidden') && pageFlip) {
+      const currentPage = pageFlip.getCurrentPageIndex();
+      rebuildFlipbook(currentPage);
     }
-  }, 200);
+  }, 300);
 });
 
 // ============ UTILS ============
