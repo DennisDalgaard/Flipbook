@@ -272,6 +272,9 @@ async function openReader(pdf) {
 
   flipbook.innerHTML = '<div class="loading-spinner"></div>';
 
+  // Wait for browser to layout the reader view before measuring dimensions
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
   try {
     pdfDoc = await pdfjsLib.getDocument(`/uploads/${pdf.filename}`).promise;
     totalPages = pdfDoc.numPages;
@@ -280,8 +283,8 @@ async function openReader(pdf) {
 
     // Determine render scale based on container size
     const container = document.querySelector('.reader-container');
-    const maxH = container.clientHeight - 40;
-    const maxW = (container.clientWidth - 120) / 2;
+    const maxH = Math.max(container.clientHeight - 40, 400);
+    const maxW = Math.max((container.clientWidth - 120) / 2, 300);
 
     const firstPage = await pdfDoc.getPage(1);
     const origViewport = firstPage.getViewport({ scale: 1 });
@@ -389,8 +392,8 @@ function rebuildFlipbook(restorePage) {
   });
 
   const container = document.querySelector('.reader-container');
-  const maxH = container.clientHeight - 40;
-  const maxW = (container.clientWidth - 120) / 2;
+  const maxH = Math.max(container.clientHeight - 40, 400);
+  const maxW = Math.max((container.clientWidth - 120) / 2, 300);
   const isMobile = window.innerWidth < 900;
 
   pageFlip = new St.PageFlip(flipbook, {
