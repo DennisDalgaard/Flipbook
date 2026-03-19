@@ -489,6 +489,17 @@ btnFullscreen.addEventListener('click', () => {
   }
 });
 
+// Rebuild flipbook when entering/exiting fullscreen
+document.addEventListener('fullscreenchange', () => {
+  if (!readerView.classList.contains('hidden') && pageFlip) {
+    // Wait for the fullscreen transition to complete
+    setTimeout(() => {
+      const currentPage = pageFlip.getCurrentPageIndex();
+      rebuildFlipbook(currentPage);
+    }, 300);
+  }
+});
+
 pageSlider.addEventListener('input', () => {
   const page = parseInt(pageSlider.value);
   if (pageFlip) pageFlip.turnToPage(page - 1);

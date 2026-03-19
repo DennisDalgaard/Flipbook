@@ -573,7 +573,6 @@ main {
   bottom: 0;
   overflow: hidden;
   line-height: 1;
-  opacity: 0.3;
 }
 
 .detail-text-layer span {
@@ -581,16 +580,15 @@ main {
   white-space: pre;
   color: transparent;
   cursor: text;
+  user-select: text;
 }
 
 .detail-text-layer span::selection {
-  background: rgba(79, 70, 229, 0.4);
-  color: transparent;
+  background: rgba(240, 78, 60, 0.35);
 }
 
 .detail-text-layer span::-moz-selection {
-  background: rgba(79, 70, 229, 0.4);
-  color: transparent;
+  background: rgba(240, 78, 60, 0.35);
 }
 
 .zoom-level {
