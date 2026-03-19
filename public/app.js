@@ -868,8 +868,14 @@ flipbook.addEventListener('touchmove', (e) => {
 flipbook.addEventListener('touchend', (e) => {
   if (magActive) {
     e.stopPropagation();
+    stopMagnifier();
   }
 }, { capture: true });
+
+// Tap magnifier to dismiss it
+magnifier.addEventListener('click', () => {
+  stopMagnifier();
+});
 
 // ============ DETAIL VIEW (zoom + text) ============
 const detailView = document.getElementById('detail-view');
