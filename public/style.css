@@ -418,6 +418,18 @@ main {
   .toolbar-btn span { display: none; }
   .nav-btn { width: 36px; height: 36px; }
   .page-slider { max-width: 50vw; }
+  .header-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  .header-actions {
+    align-self: stretch;
+  }
+  .btn-home, .admin-btn {
+    flex: 1;
+    justify-content: center;
+  }
 }
 
 /* Admin button */
