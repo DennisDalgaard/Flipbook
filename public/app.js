@@ -812,13 +812,20 @@ document.addEventListener('mouseup', () => {
 });
 
 // Mobile: long-press touch on flipbook
+// Track touch state to distinguish long-press from swipe
+let touchStartX = 0, touchStartY = 0;
+let touchIsHolding = false; // true once long-press timer is set, before swipe detected
+const SWIPE_THRESHOLD = 15; // px movement to count as swipe
+
 readerContainer.addEventListener('touchstart', (e) => {
   if (readerView.classList.contains('hidden')) return;
   if (e.touches.length !== 1) return;
   const touch = e.touches[0];
-  const tx = touch.clientX, ty = touch.clientY;
+  touchStartX = touch.clientX;
+  touchStartY = touch.clientY;
+  touchIsHolding = true;
   longPressTimer = setTimeout(() => {
-    startMagnifier(tx, ty);
+    startMagnifier(touch.clientX, touch.clientY);
   }, LONG_PRESS_MS);
 }, { passive: true });
 
@@ -827,20 +834,43 @@ readerContainer.addEventListener('touchmove', (e) => {
     e.preventDefault();
     const touch = e.touches[0];
     moveMagnifier(touch.clientX, touch.clientY);
-  } else {
-    // User is swiping/scrolling, cancel long-press
-    clearTimeout(longPressTimer);
-    longPressTimer = null;
+  } else if (touchIsHolding) {
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchStartX);
+    const dy = Math.abs(touch.clientY - touchStartY);
+    if (dx > SWIPE_THRESHOLD || dy > SWIPE_THRESHOLD) {
+      // User is swiping — cancel long-press, let StPageFlip handle it
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+      touchIsHolding = false;
+    }
   }
 }, { passive: false });
 
 readerContainer.addEventListener('touchend', () => {
+  touchIsHolding = false;
   stopMagnifier();
 });
 
 readerContainer.addEventListener('touchcancel', () => {
+  touchIsHolding = false;
   stopMagnifier();
 });
+
+// Block StPageFlip from seeing touch events during long-press/magnifier.
+// Uses capture phase on the flipbook element to intercept before StPageFlip.
+flipbook.addEventListener('touchmove', (e) => {
+  if (magActive || (touchIsHolding && longPressTimer)) {
+    e.stopPropagation();
+    e.preventDefault();
+  }
+}, { capture: true, passive: false });
+
+flipbook.addEventListener('touchend', (e) => {
+  if (magActive) {
+    e.stopPropagation();
+  }
+}, { capture: true });
 
 // ============ DETAIL VIEW (zoom + text) ============
 const detailView = document.getElementById('detail-view');
