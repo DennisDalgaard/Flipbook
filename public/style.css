@@ -427,6 +427,33 @@ main {
   align-items: center;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.btn-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  color: #9ca3af;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-family: inherit;
+  text-decoration: none;
+  transition: all var(--transition);
+}
+
+.btn-home:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
 .admin-btn {
   display: inline-flex;
   align-items: center;
