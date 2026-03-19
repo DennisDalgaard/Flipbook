@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="da">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Flipbook – PDF Viewer</title>
+  <title>Shelly Catalogs</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
@@ -15,8 +15,8 @@
       <div class="header-content">
         <div class="header-top">
           <div>
-            <h1>📖 Flipbook</h1>
-            <p class="subtitle">Gennemse PDF-filer som interaktive bøger</p>
+            <h1>Shelly Catalogs</h1>
+            <p class="subtitle">Find the latest Shelly product overview</p>
           </div>
           <button id="admin-btn" class="admin-btn" title="Admin login">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
@@ -32,13 +32,13 @@
     <!-- Login Modal -->
     <div id="login-modal" class="modal-overlay hidden">
       <div class="modal">
-        <h3>Admin login</h3>
+        <h3>Admin Login</h3>
         <form id="login-form">
-          <input type="password" id="login-password" placeholder="Adgangskode" autocomplete="current-password" required>
-          <div id="login-error" class="login-error hidden">Forkert adgangskode</div>
+          <input type="password" id="login-password" placeholder="Password" autocomplete="current-password" required>
+          <div id="login-error" class="login-error hidden">Incorrect password</div>
           <div class="modal-actions">
-            <button type="button" id="login-cancel" class="btn-secondary">Annuller</button>
-            <button type="submit" class="btn-primary">Log ind</button>
+            <button type="button" id="login-cancel" class="btn-secondary">Cancel</button>
+            <button type="submit" class="btn-primary">Log in</button>
           </div>
         </form>
       </div>
@@ -54,8 +54,8 @@
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <p>Træk en PDF-fil hertil eller <span class="browse-link">gennemse</span></p>
-            <p class="drop-hint">Max 100 MB pr. fil</p>
+            <p>Drag a PDF file here or <span class="browse-link">browse</span></p>
+            <p class="drop-hint">Max 100 MB per file</p>
           </div>
           <input type="file" id="file-input" accept=".pdf" hidden>
         </div>
@@ -67,8 +67,7 @@
 
       <!-- PDF Grid -->
       <div class="grid-header">
-        <h2>Dine dokumenter</h2>
-        <span id="pdf-count" class="pdf-count">0 filer</span>
+        <span id="pdf-count" class="pdf-count">0 catalogs</span>
       </div>
       <div id="pdf-grid" class="pdf-grid">
         <div id="empty-state" class="empty-state">
@@ -76,8 +75,8 @@
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
           </svg>
-          <p>Ingen dokumenter endnu</p>
-          <p class="empty-hint">Upload en PDF for at komme i gang</p>
+          <p>No catalogs yet</p>
+          <p class="empty-hint">Check back soon for the latest product overviews</p>
         </div>
       </div>
     </main>
@@ -86,13 +85,13 @@
   <!-- READER VIEW -->
   <div id="reader-view" class="hidden">
     <div class="reader-toolbar">
-      <button id="btn-back" class="toolbar-btn" title="Tilbage">
+      <button id="btn-back" class="toolbar-btn" title="Back">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="15 18 9 12 15 6"/>
         </svg>
-        <span>Tilbage</span>
+        <span>Back</span>
       </button>
-      <div class="toolbar-title" id="reader-title">Dokument</div>
+      <div class="toolbar-title" id="reader-title">Document</div>
       <div class="toolbar-controls">
         <button id="btn-download" class="toolbar-btn" title="Download">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -101,7 +100,7 @@
             <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
         </button>
-        <button id="btn-fullscreen" class="toolbar-btn" title="Fuldskærm">
+        <button id="btn-fullscreen" class="toolbar-btn" title="Fullscreen">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="15 3 21 3 21 9"/>
             <polyline points="9 21 3 21 3 15"/>
@@ -113,7 +112,7 @@
     </div>
 
     <div class="reader-container">
-      <button id="btn-prev" class="nav-btn nav-prev" title="Forrige side">
+      <button id="btn-prev" class="nav-btn nav-prev" title="Previous page">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="15 18 9 12 15 6"/>
         </svg>
@@ -121,7 +120,7 @@
 
       <div id="flipbook" class="flipbook"></div>
 
-      <button id="btn-next" class="nav-btn nav-next" title="Næste side">
+      <button id="btn-next" class="nav-btn nav-next" title="Next page">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="9 6 15 12 9 18"/>
         </svg>
@@ -129,7 +128,7 @@
     </div>
 
     <div class="reader-footer">
-      <span id="page-info">Side 1 af 1</span>
+      <span id="page-info">Page 1 of 1</span>
       <input type="range" id="page-slider" min="1" max="1" value="1" class="page-slider">
     </div>
   </div>

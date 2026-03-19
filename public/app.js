@@ -62,7 +62,7 @@ function setAdminUI(admin) {
   if (admin) {
     uploadSection.classList.remove('hidden');
     adminBtn.classList.add('logged-in');
-    adminBtnText.textContent = 'Log ud';
+    adminBtnText.textContent = 'Log out';
   } else {
     uploadSection.classList.add('hidden');
     adminBtn.classList.remove('logged-in');
@@ -129,12 +129,12 @@ function renderGrid(pdfs) {
 
   if (pdfs.length === 0) {
     emptyState.classList.remove('hidden');
-    pdfCount.textContent = '0 filer';
+    pdfCount.textContent = '0 catalogs';
     return;
   }
 
   emptyState.classList.add('hidden');
-  pdfCount.textContent = `${pdfs.length} fil${pdfs.length !== 1 ? 'er' : ''}`;
+  pdfCount.textContent = `${pdfs.length} catalog${pdfs.length !== 1 ? 's' : ''}`;
 
   pdfs.forEach(pdf => {
     const card = document.createElement('div');
@@ -148,7 +148,7 @@ function renderGrid(pdfs) {
           <span>${formatDate(pdf.uploadedAt)}</span>
         </div>
       </div>
-      ${isAdmin ? `<button class="pdf-card-delete" data-id="${pdf.id}" title="Slet">
+      ${isAdmin ? `<button class="pdf-card-delete" data-id="${pdf.id}" title="Delete">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
         </svg>
@@ -164,7 +164,7 @@ function renderGrid(pdfs) {
     if (deleteBtn) {
       deleteBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        if (!confirm(`Slet "${pdf.originalName}"?`)) return;
+        if (!confirm(`Delete "${pdf.originalName}"?`)) return;
         await fetch(`/api/pdfs/${pdf.id}`, {
           method: 'DELETE',
           headers: { 'Authorization': 'Bearer ' + adminToken }
@@ -219,7 +219,7 @@ async function uploadFile(file) {
 
   uploadProgress.classList.remove('hidden');
   progressFill.style.width = '0%';
-  progressText.textContent = 'Uploader...';
+  progressText.textContent = 'Uploading...';
 
   const xhr = new XMLHttpRequest();
   xhr.open('POST', '/api/upload');
@@ -235,11 +235,11 @@ async function uploadFile(file) {
 
   xhr.onload = () => {
     if (xhr.status === 200) {
-      progressText.textContent = 'Færdig!';
+      progressText.textContent = 'Done!';
       setTimeout(() => uploadProgress.classList.add('hidden'), 1500);
       loadLibrary();
     } else {
-      progressText.textContent = 'Fejl ved upload';
+      progressText.textContent = 'Upload failed';
     }
   };
 
@@ -306,7 +306,7 @@ async function openReader(pdf) {
       renderRemainingPages(firstBatch + 1, totalPages, scale);
     }
   } catch (err) {
-    flipbook.innerHTML = '<p style="color:#ef4444">Kunne ikke indlæse PDF</p>';
+    flipbook.innerHTML = '<p style="color:#ef4444">Could not load PDF</p>';
   }
 }
 
@@ -334,7 +334,7 @@ function initFlipbook(pageWidth, pageHeight) {
     div.setAttribute('data-density', (i === 0 || i === pageImages.length - 1) ? 'hard' : 'soft');
     const img = document.createElement('img');
     img.src = src;
-    img.alt = `Side ${i + 1}`;
+    img.alt = `Page ${i + 1}`;
     div.appendChild(img);
     flipbook.appendChild(div);
   });
@@ -383,7 +383,7 @@ function rebuildFlipbook(restorePage) {
     div.setAttribute('data-density', (i === 0 || i === pageImages.length - 1) ? 'hard' : 'soft');
     const img = document.createElement('img');
     img.src = src;
-    img.alt = `Side ${i + 1}`;
+    img.alt = `Page ${i + 1}`;
     div.appendChild(img);
     flipbook.appendChild(div);
   });
@@ -423,7 +423,7 @@ function rebuildFlipbook(restorePage) {
 
 function updatePageInfo(pageIndex) {
   const displayPage = pageIndex + 1;
-  pageInfo.textContent = `Side ${displayPage} af ${totalPages}`;
+  pageInfo.textContent = `Page ${displayPage} of ${totalPages}`;
   pageSlider.value = displayPage;
   pageSlider.max = totalPages;
   updateNavButtons();
@@ -517,7 +517,7 @@ function formatSize(bytes) {
 
 function formatDate(iso) {
   const d = new Date(iso);
-  return d.toLocaleDateString('da-DK', { day: 'numeric', month: 'short', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function escapeHtml(str) {
