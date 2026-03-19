@@ -589,15 +589,16 @@ main {
 .detail-container {
   flex: 1;
   overflow: auto;
-  display: flex;
-  justify-content: center;
+  -webkit-overflow-scrolling: touch;
   padding: 1rem;
+  text-align: center;
 }
 
 .detail-page-wrapper {
   position: relative;
   display: inline-block;
   box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  margin: 0 auto;
 }
 
 #detail-canvas {

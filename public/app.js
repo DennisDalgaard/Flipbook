@@ -654,6 +654,32 @@ detailContainer.addEventListener('wheel', (e) => {
   }
 });
 
+// Pinch-to-zoom on mobile in detail view
+let pinchStartDist = 0;
+let pinchStartZoom = 1;
+
+detailContainer.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    pinchStartDist = Math.hypot(dx, dy);
+    pinchStartZoom = detailZoom;
+  }
+}, { passive: false });
+
+detailContainer.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 2) {
+    e.preventDefault();
+    const dx = e.touches[0].clientX - e.touches[1].clientX;
+    const dy = e.touches[0].clientY - e.touches[1].clientY;
+    const dist = Math.hypot(dx, dy);
+    const scale = dist / pinchStartDist;
+    detailZoom = Math.min(Math.max(pinchStartZoom * scale, 0.25), 5);
+    renderDetailPage();
+  }
+}, { passive: false });
+
 // Keyboard navigation in detail view
 document.addEventListener('keydown', (e) => {
   if (detailView.classList.contains('hidden')) return;
