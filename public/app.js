@@ -259,7 +259,7 @@ async function renderPageToImage(doc, pageNum, scale) {
   canvas.height = viewport.height;
   const ctx = canvas.getContext('2d');
   await page.render({ canvasContext: ctx, viewport }).promise;
-  return canvas.toDataURL('image/jpeg', 0.92);
+  return canvas.toDataURL('image/png');
 }
 
 async function openReader(pdf) {
@@ -281,26 +281,38 @@ async function openReader(pdf) {
     pageSlider.max = totalPages;
     pageSlider.value = 1;
 
-    // Determine render scale based on container size
     const container = document.querySelector('.reader-container');
-    const maxH = Math.max(container.clientHeight - 40, 400);
-    const maxW = Math.max((container.clientWidth - 120) / 2, 300);
+    const containerH = Math.max(container.clientHeight - 40, 400);
+    const containerW = Math.max(container.clientWidth - 120, 600);
 
     const firstPage = await pdfDoc.getPage(1);
     const origViewport = firstPage.getViewport({ scale: 1 });
-    const scaleH = maxH / origViewport.height;
-    const scaleW = maxW / origViewport.width;
-    const scale = Math.min(scaleH, scaleW, 2);
+    const pageAspect = origViewport.width / origViewport.height;
+
+    // In book mode (2 pages side by side), each page gets half the width
+    const isMobile = window.innerWidth < 900;
+    const availW = isMobile ? containerW : containerW / 2;
+
+    // Fit to height first, then check if width fits
+    const scaleByH = containerH / origViewport.height;
+    const scaleByW = availW / origViewport.width;
+    const displayScale = Math.min(scaleByH, scaleByW);
+
+    const displayW = Math.round(origViewport.width * displayScale);
+    const displayH = Math.round(origViewport.height * displayScale);
+
+    // Render at higher resolution for crisp text (2x the display size, min 3)
+    const renderScale = Math.max(displayScale * 2, 3);
 
     // Render all pages before initializing flipbook
     for (let i = 1; i <= totalPages; i++) {
-      if (!pdfDoc) return; // Reader was closed
-      const img = await renderPageToImage(pdfDoc, i, scale);
+      if (!pdfDoc) return;
+      const img = await renderPageToImage(pdfDoc, i, renderScale);
       pageImages.push(img);
     }
 
-    // Initialize flipbook once with all pages
-    initFlipbook(origViewport.width * scale, origViewport.height * scale);
+    // Initialize flipbook with height-fitted dimensions
+    initFlipbook(displayW, displayH);
   } catch (err) {
     flipbook.innerHTML = '<p style="color:#ef4444">Could not load PDF</p>';
   }
@@ -324,17 +336,17 @@ function initFlipbook(pageWidth, pageHeight) {
   const isMobile = window.innerWidth < 900;
 
   pageFlip = new St.PageFlip(flipbook, {
-    width: Math.round(pageWidth),
-    height: Math.round(pageHeight),
-    size: 'stretch',
+    width: pageWidth,
+    height: pageHeight,
+    size: 'fixed',
     minWidth: 200,
-    maxWidth: 800,
+    maxWidth: pageWidth,
     minHeight: 280,
-    maxHeight: 1200,
+    maxHeight: pageHeight,
     showCover: true,
     maxShadowOpacity: 0.5,
     mobileScrollSupport: true,
-    autoSize: true,
+    autoSize: false,
     drawShadow: true,
     flippingTime: 800,
     usePortrait: isMobile,
@@ -372,22 +384,37 @@ function rebuildFlipbook(restorePage) {
   });
 
   const container = document.querySelector('.reader-container');
-  const maxH = Math.max(container.clientHeight - 40, 400);
-  const maxW = Math.max((container.clientWidth - 120) / 2, 300);
+  const containerH = Math.max(container.clientHeight - 40, 400);
+  const containerW = Math.max(container.clientWidth - 120, 600);
   const isMobile = window.innerWidth < 900;
 
+  // Estimate page aspect from the first image
+  const tempImg = new Image();
+  tempImg.src = pageImages[0];
+  const imgW = tempImg.naturalWidth || 600;
+  const imgH = tempImg.naturalHeight || 800;
+  const pageAspect = imgW / imgH;
+
+  const availW = isMobile ? containerW : containerW / 2;
+  const scaleByH = containerH / imgH;
+  const scaleByW = availW / imgW;
+  const fitScale = Math.min(scaleByH, scaleByW);
+
+  const displayW = Math.round(imgW * fitScale);
+  const displayH = Math.round(imgH * fitScale);
+
   pageFlip = new St.PageFlip(flipbook, {
-    width: Math.round(maxW),
-    height: Math.round(maxH),
-    size: 'stretch',
+    width: displayW,
+    height: displayH,
+    size: 'fixed',
     minWidth: 200,
-    maxWidth: 800,
+    maxWidth: displayW,
     minHeight: 280,
-    maxHeight: 1200,
+    maxHeight: displayH,
     showCover: true,
     maxShadowOpacity: 0.5,
     mobileScrollSupport: true,
-    autoSize: true,
+    autoSize: false,
     drawShadow: true,
     flippingTime: 800,
     usePortrait: isMobile,
