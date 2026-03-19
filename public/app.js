@@ -829,24 +829,6 @@ readerContainer.addEventListener('touchstart', (e) => {
   }, LONG_PRESS_MS);
 }, { passive: true });
 
-readerContainer.addEventListener('touchmove', (e) => {
-  if (magActive) {
-    e.preventDefault();
-    const touch = e.touches[0];
-    moveMagnifier(touch.clientX, touch.clientY);
-  } else if (touchIsHolding) {
-    const touch = e.touches[0];
-    const dx = Math.abs(touch.clientX - touchStartX);
-    const dy = Math.abs(touch.clientY - touchStartY);
-    if (dx > SWIPE_THRESHOLD || dy > SWIPE_THRESHOLD) {
-      // User is swiping — cancel long-press, let StPageFlip handle it
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
-      touchIsHolding = false;
-    }
-  }
-}, { passive: false });
-
 readerContainer.addEventListener('touchend', () => {
   touchIsHolding = false;
   stopMagnifier();
@@ -857,12 +839,29 @@ readerContainer.addEventListener('touchcancel', () => {
   stopMagnifier();
 });
 
-// Block StPageFlip from seeing touch events during long-press/magnifier.
-// Uses capture phase on the flipbook element to intercept before StPageFlip.
+// Capture-phase listeners on flipbook: block StPageFlip AND handle magnifier
+// movement in the same listener (since stopPropagation prevents bubble-phase).
 flipbook.addEventListener('touchmove', (e) => {
-  if (magActive || (touchIsHolding && longPressTimer)) {
+  if (magActive) {
+    // Move the magnifier and block StPageFlip
     e.stopPropagation();
     e.preventDefault();
+    const touch = e.touches[0];
+    moveMagnifier(touch.clientX, touch.clientY);
+  } else if (touchIsHolding && longPressTimer) {
+    const touch = e.touches[0];
+    const dx = Math.abs(touch.clientX - touchStartX);
+    const dy = Math.abs(touch.clientY - touchStartY);
+    if (dx > SWIPE_THRESHOLD || dy > SWIPE_THRESHOLD) {
+      // User is swiping — cancel long-press, let StPageFlip handle it
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+      touchIsHolding = false;
+    } else {
+      // Still holding still — block StPageFlip while waiting for long-press
+      e.stopPropagation();
+      e.preventDefault();
+    }
   }
 }, { capture: true, passive: false });
 
