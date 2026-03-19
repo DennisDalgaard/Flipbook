@@ -183,6 +183,46 @@ async function loadLibrary() {
   const res = await fetch('/api/pdfs');
   const pdfs = await res.json();
   renderGrid(pdfs);
+
+  // Auto-detect language for PDFs that don't have one (admin only, runs in background)
+  if (isAdmin) {
+    for (const pdf of pdfs) {
+      if (!pdf.language) {
+        autoDetectAndSave(pdf);
+      }
+    }
+  }
+}
+
+async function autoDetectAndSave(pdf) {
+  try {
+    const doc = await pdfjsLib.getDocument(`/uploads/${pdf.filename}`).promise;
+    let text = '';
+    const pagesToCheck = Math.min(doc.numPages, 3);
+    for (let i = 1; i <= pagesToCheck; i++) {
+      const page = await doc.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(item => item.str).join(' ') + ' ';
+    }
+    doc.destroy();
+    const detected = detectLanguage(text);
+    if (detected) {
+      await fetch(`/api/pdfs/${pdf.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + adminToken
+        },
+        body: JSON.stringify({ language: detected })
+      });
+      // Refresh grid to show the badge
+      const res = await fetch('/api/pdfs');
+      const updatedPdfs = await res.json();
+      renderGrid(updatedPdfs);
+    }
+  } catch {
+    // Silently fail for auto-detect
+  }
 }
 
 function renderGrid(pdfs) {
@@ -229,7 +269,7 @@ function renderGrid(pdfs) {
     `;
 
     card.addEventListener('click', (e) => {
-      if (e.target.closest('.pdf-card-delete')) return;
+      if (e.target.closest('.pdf-card-actions')) return;
       openReader(pdf);
     });
 

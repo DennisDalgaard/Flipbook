@@ -493,6 +493,10 @@ main {
     flex: 1;
     justify-content: center;
   }
+  /* Always show admin actions on mobile (no hover) */
+  .pdf-card-actions {
+    opacity: 1;
+  }
 }
 
 /* Admin button */
