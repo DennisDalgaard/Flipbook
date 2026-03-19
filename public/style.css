@@ -387,6 +387,9 @@ main {
   position: relative;
   overflow: hidden;
   padding: 1rem;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .flipbook {
@@ -409,6 +412,8 @@ main {
   height: 100%;
   object-fit: contain;
   display: block;
+  -webkit-touch-callout: none;
+  pointer-events: none;
 }
 
 /* Nav buttons */

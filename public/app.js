@@ -700,12 +700,23 @@ function findPageImgAt(x, y) {
   // Find which page image element is under the pointer
   const els = document.elementsFromPoint(x, y);
   for (const el of els) {
+    // Direct img hit or img inside a page-content parent
     if (el.tagName === 'IMG' && el.closest('.page-content')) {
       return el;
     }
-    // Also check canvas inside stPageFlip
+    // page-content div (img may have pointer-events: none)
+    if (el.classList && el.classList.contains('page-content')) {
+      const img = el.querySelector('img');
+      if (img) return img;
+    }
+    // Canvas rendered by stPageFlip
     if (el.tagName === 'CANVAS' && el.closest('.stf__parent')) {
       return el;
+    }
+    // stf wrapper divs — look for canvas inside
+    if (el.closest && el.closest('.stf__parent')) {
+      const canvas = el.closest('.stf__parent').querySelector('canvas');
+      if (canvas) return canvas;
     }
   }
   return null;
@@ -775,6 +786,11 @@ function stopMagnifier() {
 
 // Desktop: hold mouse button on flipbook
 const readerContainer = document.querySelector('.reader-container');
+
+// Prevent native long-press context menu on mobile
+readerContainer.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
+});
 
 readerContainer.addEventListener('mousedown', (e) => {
   if (e.button !== 0) return; // left button only
